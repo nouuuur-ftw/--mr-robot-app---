@@ -1,2 +1,243 @@
 # --mr-robot-app---
 Simple Python app to manage an organization’s members and activities
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+# === CLASSES MÉTIERS ===
+class Entite:
+    def __init__(self, nom):
+        self.nom = nom
+# Classe représentant un produit, hérite de Entite (HÉRITAGE SIMPLE)
+class Produit(Entite):
+    def __init__(self, id_produit, nom, stock, prix):
+        super().__init__(nom)# Appelle le constructeur de la classe parente
+        self.id_produit = id_produit # Identifiant unique du produit
+        self.stock = stock # Quantité en stock
+        self.prix = prix# Prix unitaire du produit
+        
+    # Méthode pour afficher les informations du produit
+    def afficher(self):
+        return f"[{self.id_produit}] {self.nom} - Stock: {self.stock} - Prix: {self.prix:.2f} TND"
+# Classe représentant une vente de produit(AGRÉGATION)
+class Vente:
+    def __init__(self, id_vente, produit, quantite, date, mode_paiement, vendeur):
+        self.id_vente = id_vente # Identifiant unique de la vente
+        self.produit = produit # Produit vendu
+        self.quantite = quantite  # Quantité vendue
+        self.date = date # Date de la vente
+        self.mode_paiement = mode_paiement  # Mode de paiement utilisé
+        self.vendeur = vendeur # Nom du vendeur
+        
+# Méthode pour afficher les informations de la vente(POLYMORPHISME)
+    def afficher(self):
+        total = self.quantite * self.produit.prix # Calcul du total
+        return (f"#{self.id_vente} {self.produit.nom} - Qté: {self.quantite} - "
+                f"Total: {total:.2f} TND - Paiement: {self.mode_paiement} - "
+                f"Vendeur: {self.vendeur} - Date: {self.date}")
+# Classe représentant un livreur (HÉRITAGE SIMPLE)
+class Livreur(Entite):
+    def __init__(self, id_livreur, nom, telephone):
+        super().__init__(nom)  # Appelle le constructeur de Entite
+        self.id_livreur = id_livreur # Identifiant unique du livreur
+        self.telephone = telephone  # Numéro de téléphone du livreur
+        
+ # Méthode pour afficher les informations du livreur (POLYMORPHISME)
+    def afficher(self):
+        return f"#{self.id_livreur} {self.nom} - Téléphone: {self.telephone}"
+# Classe représentant un magasin
+class Magasin(Entite):
+    def __init__(self, nom, adresse):
+        super().__init__(nom) # Initialise le nom du magasin
+        self.adresse = adresse   # Adresse du magasin
+        self.produits = [] #Liste des produits disponibles
+        self.ventes = [] #Liste des ventes réalisées
+        self.livreurs = [] #Liste des livreurs associés
+        
+# Ajouter un produit à la liste des produits du magasin
+    def ajouter_produit(self, produit):
+        self.produits.append(produit)
+# Effectuer une vente d'un produit
+    def effectuer_vente(self, id_vente, id_produit, quantite, date, mode_paiement, vendeur):
+        for produit in self.produits:
+            if produit.id_produit == id_produit:# Vérifie si l'identifiant du produit correspond à celui recherché
+                if produit.stock >= quantite:# Vérifie si le stock est suffisant pour effectuer la vente
+                    produit.stock -= quantite# Réduction du stock après vente
+                    vente = Vente(id_vente, produit, quantite, date, mode_paiement, vendeur)# Crée une nouvelle vente avec les informations fournies
+                    self.ventes.append(vente)# Ajoute la vente à la liste des ventes du magasin
+                    return f"✅ Vente enregistrée pour {produit.nom}"
+                else:
+                    return "❌ Stock insuffisant"
+        return "❌ Produit introuvable"
+# Ajouter un livreur à la liste des livreurs du magasin(AGRÉGATION)
+    def ajouter_livreur(self, livreur):
+        self.livreurs.append(livreur)
+        
+##===INTERFACE GRAPHIQUE===    
+class Application(tk.Tk):
+    def __init__(self, magasin):
+        super().__init__() # Initialise la fenêtre principale
+        self.magasin = magasin
+        self.title("Gestion de magasin") # Définit le titre de la fenêtre principale de l'application
+        self.geometry("800x600")
+        self.configure(bg="#f0f0f0")
+ # Affiche le nom et l'adresse du magasin
+        tk.Label(self, text=f"{magasin.nom} - {magasin.adresse}",
+                 font=("Helvetica", 16, "bold"), bg="#333", fg="white").pack(fill="x")
+# Création d'onglets pour gérer les produits, ventes et livreurs
+        self.tabs = ttk.Notebook(self)
+        self.tabs.pack(fill="both", expand=True)
+
+        self._init_produits_tab()
+        self._init_ventes_tab()
+        self._init_livreurs_tab()
+
+    def _init_produits_tab(self):
+        tab = tk.Frame(self.tabs, bg="#e6f7ff")
+        self.tabs.add(tab, text="Produits")
+# Interface pour ajouter un produit
+        frame_form = tk.Frame(tab, bg="#e6f7ff")
+        frame_form.pack(pady=10)
+        self.id_produit = tk.Entry(frame_form)# Champs de saisie pour les attributs du produit
+        self.nom_produit = tk.Entry(frame_form)
+        self.stock_produit = tk.Entry(frame_form)
+        self.prix_produit = tk.Entry(frame_form)
+        for i, (lbl, entry) in enumerate(zip(["ID", "Nom", "Stock", "Prix"], [self.id_produit, self.nom_produit, self.stock_produit, self.prix_produit])):
+            tk.Label(frame_form, text=lbl, bg="#e6f7ff").grid(row=i, column=0)# Ajout de labels et des champs de saisie
+            entry.grid(row=i, column=1)
+# Création d'un bouton pour ajouter un produit
+        tk.Button(tab, text="Ajouter Produit", bg="#4CAF50", fg="white", command=self.ajouter_produit).pack(pady=5)
+        self.zone_produits = tk.Text(tab, height=12)
+        self.zone_produits.pack(fill="both", padx=10, pady=5)
+# Initialisation de l'onglet "Ventes"
+    def _init_ventes_tab(self):
+        tab = tk.Frame(self.tabs, bg="#fff3e6")# Création d'un cadre (Frame) qui servira de conteneur pour les widgets de cet onglet
+        self.tabs.add(tab, text="Ventes")
+# Création d'un sous-cadre pour le formulaire de saisie des informations de vente
+        frame_form = tk.Frame(tab, bg="#fff3e6")
+        frame_form.pack(pady=10)
+         # Définition des champs de saisie pour les détails d'une vente
+        self.id_vente = tk.Entry(frame_form) # Champ pour l'identifiant de la vente
+        self.id_produit_vente = tk.Entry(frame_form)# Champ pour l'identifiant du produit
+        self.qte_vente = tk.Entry(frame_form)# Champ pour la quantité vendue
+        self.date_vente = tk.Entry(frame_form)  # Champ pour la date de la vente
+        self.paiement_vente = tk.Entry(frame_form)# Champ pour le mode de paiement
+        self.vendeur_vente = tk.Entry(frame_form)# Champ pour le vendeur
+        # Liste des intitulés des champs et leur correspondance avec les Entry
+        champs = ["ID Vente", "ID Produit", "Quantité", "Date", "Paiement", "Vendeur"]
+        entrees = [self.id_vente, self.id_produit_vente, self.qte_vente, self.date_vente, self.paiement_vente, self.vendeur_vente]
+        # Boucle pour créer les labels et les champs de saisie dynamiquement
+        for i, (lbl, entry) in enumerate(zip(champs, entrees)):
+            tk.Label(frame_form, text=lbl, bg="#fff3e6").grid(row=i, column=0)# Ajoute un label pour chaque champ
+            entry.grid(row=i, column=1)# Place le champ de saisie à côté du label
+        # Création du bouton permettant d'effectuer une vente
+        tk.Button(tab, text="Effectuer Vente", bg="#2196F3", fg="white", command=self.effectuer_vente).pack(pady=5)
+        # Création d'une zone de texte pour afficher la liste des ventes effectuées
+        self.zone_ventes = tk.Text(tab, height=12)
+        self.zone_ventes.pack(fill="both", padx=10, pady=5)
+
+    def _init_livreurs_tab(self):
+        tab = tk.Frame(self.tabs, bg="#e6ffe6")
+        self.tabs.add(tab, text="Livreurs")
+        # Création d'un sous-cadre pour les champs de saisie
+        frame_form = tk.Frame(tab, bg="#e6ffe6")
+        frame_form.pack(pady=10)
+        # Définition des champs de saisie pour les informations du livreur
+        self.id_livreur = tk.Entry(frame_form)
+        self.nom_livreur = tk.Entry(frame_form)
+        self.tel_livreur = tk.Entry(frame_form)
+        # Boucle pour créer les labels et les champs de saisie dynamiquement
+        for i, (lbl, entry) in enumerate(zip(["ID", "Nom", "Téléphone"], [self.id_livreur, self.nom_livreur, self.tel_livreur])):
+            tk.Label(frame_form, text=lbl, bg="#e6ffe6").grid(row=i, column=0)
+            entry.grid(row=i, column=1)
+        tk.Button(tab, text="Ajouter Livreur", bg="#009688", fg="white", command=self.ajouter_livreur).pack(pady=5)
+        self.zone_livreurs = tk.Text(tab, height=12)
+        self.zone_livreurs.pack(fill="both", padx=10, pady=5)
+# === Méthode pour ajouter un produit ===
+    def ajouter_produit(self):
+        try:# Création d'un nouvel objet Produit avec les données saisies
+            prod = Produit(int(self.id_produit.get()), self.nom_produit.get(),
+                           int(self.stock_produit.get()), float(self.prix_produit.get()))# Récupération et conversion de l'identifiant en entier
+            self.magasin.ajouter_produit(prod)# Ajout du produit à la liste du magasin
+            self.afficher_produits() # Mise à jour de l'affichage des produits
+        except Exception as e:
+             messagebox.showwarning("Champs incomplets", "Veuillez remplir tous les champs!")# Affichage d'un message d'erreur en cas de problème
+# === Méthode pour afficher la liste des produits ===
+    def afficher_produits(self):
+        self.zone_produits.delete(1.0, tk.END) # Efface le contenu existant dans la zone de texte
+        for p in self.magasin.produits:# Parcourt la liste des produits dans le magasin et les affiche
+            self.zone_produits.insert(tk.END, p.afficher() + "\n")
+# === Méthode pour effectuer une vente ===
+    def effectuer_vente(self):
+        try: # Appelle la méthode effectuer_vente du magasin avec les informations saisi
+            msg = self.magasin.effectuer_vente(
+                int(self.id_vente.get()),# ID de la vente
+                int(self.id_produit_vente.get()),# ID du produit vendu
+                int(self.qte_vente.get()),# Quantité vendue
+                self.date_vente.get(),# date de la vente
+                self.paiement_vente.get(),# Mode de paiement utilisé
+                self.vendeur_vente.get()# Nom du vendeur
+            )
+            self.afficher_ventes()# Met à jour l'affichage des ventes après l'opération
+            messagebox.showinfo("Résultat", msg)# Affiche une boîte de dialogue avec le message de confirmation ou d'erreur
+        except Exception as e:
+            messagebox.showwarning("Champs incomplets", "Veuillez remplir tous les champs!")
+            return
+# === Méthode pour afficher la liste des ventes ===
+    def afficher_ventes(self):
+        self.zone_ventes.delete(1.0, tk.END) # Efface le contenu existant dans la zone de texte des ventes
+        for v in self.magasin.ventes:# Parcourt la liste des ventes et les affiche dans la zone de texte
+            self.zone_ventes.insert(tk.END, v.afficher() + "\n")
+# === Méthode pour ajouter un livreur ===
+    def ajouter_livreur(self):
+        try: # Crée un nouvel objet Livreur avec les informations saisies
+            liv = Livreur(int(self.id_livreur.get()), self.nom_livreur.get(), self.tel_livreur.get())
+            self.magasin.ajouter_livreur(liv)# Ajoute le livreur à la liste des livreurs du magasin
+            self.afficher_livreurs()
+        except Exception as e:
+            messagebox.showwarning("Champs incomplets", "Veuillez remplir tous les champs!")
+            return 
+# === Méthode pour afficher la liste des livreurs ===
+    def afficher_livreurs(self):
+        self.zone_livreurs.delete(1.0, tk.END)# Efface le contenu existant dans la zone de texte des livreurs
+        for l in self.magasin.livreurs:  # Parcourt la liste des livreurs et les affiche
+            self.zone_livreurs.insert(tk.END, l.afficher() + "\n")
+
+# === FENÊTRE DE CONNEXION ===
+class LoginWindow(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Connexion") # Définit le titre de la fenêtre
+        self.geometry("300x180")  # Définit les dimensions de la fenêtre
+        self.configure(bg="#f2f2f2")  # Définit la couleur d'arrière-plan
+# Label et champ de saisie pour le nom d'utilisateur
+        tk.Label(self, text="Nom d'utilisateur", bg="#f2f2f2").pack(pady=5)
+        self.username_entry = tk.Entry(self)
+        self.username_entry.pack(pady=5)
+# Label et champ de saisie pour le mot de passe (caché avec "*")
+        tk.Label(self, text="Mot de passe", bg="#f2f2f2").pack(pady=5)
+        self.password_entry = tk.Entry(self, show="*")
+        self.password_entry.pack(pady=5)
+# Bouton de connexion avec un fond vert
+        tk.Button(self, text="Se connecter", bg="#4CAF50", fg="white", command=self.verifier_login).pack(pady=10)
+# Dictionnaire contenant les utilisateurs et leurs mots de passe
+        self.utilisateurs = {
+            "admin": "admin123",
+            "user": "pass"
+        }
+# Vérifie les identifiants de connexion fournis par l'utilisateur
+    def verifier_login(self):
+        utilisateur = self.username_entry.get()# Récupère le nom d'utilisateur entré dans le champ de texte
+        mot_de_passe = self.password_entry.get()  # Récupère le mot de passe entré dans le champ de texte
+        if utilisateur in self.utilisateurs and self.utilisateurs[utilisateur] == mot_de_passe: # Vérifie si l'utilisateur et le mot de passe sont corrects
+            self.destroy()# Ferme la fenêtre de connexion
+            magasin = Magasin("Magasin Ouardi", "Ariana")  # Crée un objet Magasin
+            app = Application(magasin)  # Initialise l'application avec le magasin
+            app.mainloop()  # Lance l'application graphique
+        else:
+            messagebox.showerror("Erreur", "Identifiants invalides.")# Affiche un message d'erreur indiquant que les informations saisies sont incorrectes
+
+
+# === LANCEMENT PRINCIPAL ===
+if __name__ == "__main__":
+    login = LoginWindow()
+    login.mainloop()
